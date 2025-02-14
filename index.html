@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>反応速度ゲーム</title>
+  <style>
+    body {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      background-color: #eee;
+      margin: 0;
+      padding: 0;
+    }
+    #gameArea {
+      margin: 50px auto;
+      width: 80%;
+      max-width: 600px;
+      padding: 20px;
+      border: 2px solid #333;
+      border-radius: 10px;
+      background-color: #f0f0f0;
+    }
+    #startButton {
+      font-size: 20px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 24px;
+      min-height: 50px;
+    }
+  </style>
+</head>
+<body>
+  <div id="gameArea">
+    <button id="startButton">スタート</button>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const startButton = document.getElementById('startButton');
+    const resultDiv   = document.getElementById('result');
+    const gameArea    = document.getElementById('gameArea');
+
+    const TRIALS = 5;  // 試行回数
+    let totalReactionTime = 0;
+
+    // 指定ミリ秒待つためのPromise
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // 1試行分の処理をPromiseで管理する関数
+    function runTrial() {
+      return new Promise((resolve) => {
+        let signalTime = null;
+        let timeoutId;
+
+        // クリックイベントのハンドラ
+        const clickHandler = function() {
+          const clickTime = Date.now();
+          // もし信号（背景色変更＆メッセージ）が出ていなければ早すぎ（フライング）
+          if (!signalTime) {
+            clearTimeout(timeoutId); // もしタイマーが残っていればキャンセル
+            gameArea.removeEventListener('click', clickHandler);
+            resultDiv.textContent = "フライング！";
+            resolve(1000);  // ペナルティとして1000msを設定
+          } else {
+            gameArea.removeEventListener('click', clickHandler);
+            const reactionTime = clickTime - signalTime;
+            resultDiv.textContent = "あなたの反応時間は " + reactionTime + " ms です！";
+            resolve(reactionTime);
+          }
+        };
+
+        // ゲームエリアにクリックイベントを設定
+        gameArea.addEventListener('click', clickHandler);
+
+        // 試行開始前の状態にリセット
+        gameArea.style.backgroundColor = "#f0f0f0";
+        resultDiv.textContent = "待機中...";
+
+        // 2000～5000msの間でランダムな遅延を設定
+        const randomDelay = Math.floor(Math.random() * (5000 - 2000 + 1)) + 2000;
+        timeoutId = setTimeout(() => {
+          // 信号発生：背景色を変更し、クリックを促す
+          gameArea.style.backgroundColor = "#8f8"; // 薄い緑色
+          resultDiv.textContent = "今すぐクリック！";
+          signalTime = Date.now();
+        }, randomDelay);
+      });
+    }
+
+    // ゲーム全体の流れを管理するasync関数
+    async function startGame() {
+      startButton.disabled = true;
+      startButton.style.display = "none"; // ゲーム中はボタンを非表示
+      totalReactionTime = 0;
+
+      for (let i = 0; i < TRIALS; i++) {
+        resultDiv.textContent = "試行 " + (i + 1) + " / " + TRIALS;
+        // 各試行の前に少し待つ
+        await sleep(1000);
+
+        // 1試行分を実行し、反応時間を取得
+        const reactionTime = await runTrial();
+        totalReactionTime += reactionTime;
+
+        // 試行後、結果を見やすくするために少し待ってリセット
+        await sleep(1000);
+        gameArea.style.backgroundColor = "#f0f0f0";
+      }
+
+      // 全試行終了後、平均反応時間を表示
+      const average = Math.round(totalReactionTime / TRIALS);
+      resultDiv.textContent = "平均反応速度: " + average + " ms";
+      // ゲームを再スタートできるようにボタンを復活
+      startButton.disabled = false;
+      startButton.style.display = "inline-block";
+    }
+
+    // スタートボタンにクリックイベントを設定
+    startButton.addEventListener('click', () => {
+      startGame();
+    });
+  </script>
+</body>
+</html>
